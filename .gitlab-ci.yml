@@ -1,0 +1,43 @@
+stages:
+  - packaging
+  - build_docker_image
+
+default:
+  image: maven:3.8.3-openjdk-17
+
+variables:
+  MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+
+run unit tests and package:
+  inherit:
+    default: true
+    variables: true
+  stage: packaging
+  script:
+    - mvn clean package
+  artifacts:
+    paths:
+      - target/*.jar
+      #- target/surefire-reports
+  cache:
+    paths:
+      - .m2/repository
+
+# Build docker image form Docker compose
+build docker image:
+  image: docker:latest
+  stage: build_docker_image
+  inherit:
+    default: false
+    variables: false
+  services:
+    - docker:dind
+  script:
+    - docker build -t $DOCKER_HUB_USER/stock-ms:0.0.1 .
+    - docker save $DOCKER_HUB_USER/stock-ms:0.0.1 > stock-ms.tar
+    - docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_TOKEN
+    - docker push $DOCKER_HUB_USER/stock-ms:0.0.1
+  artifacts:
+    paths:
+      - stock-ms.tar
+  when: manual
